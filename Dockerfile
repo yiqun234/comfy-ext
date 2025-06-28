@@ -18,6 +18,7 @@ RUN comfy-node-install comfyui_essentials
 RUN comfy-node-install comfyui-in-context-lora-utils
 RUN comfy-node-install comfyui-kjnodes
 RUN comfy-node-install comfyui_custom_nodes_alekpet
+
 RUN comfy-node-install comfyui-logicutils
 RUN comfy-node-install comfyui-get-meta
 RUN comfy-node-install teacachehunyuanvideo
