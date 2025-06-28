@@ -15,20 +15,17 @@ ENV CC=/usr/bin/gcc
 RUN comfy-node-install comfyui-manager
 RUN comfy-node-install comfyui_layerstyle
 
-RUN comfy-node-install comfyui-in-context-lora-utils
-RUN comfy-node-install comfyui-kjnodes
-
-
-RUN comfy-node-install comfyui-logicutils
-RUN comfy-node-install comfyui-get-meta
-RUN comfy-node-install teacachehunyuanvideo
-RUN comfy-node-install comfy-mtb
-RUN comfy-node-install teacache
-RUN comfy-node-install ComfyUI_EmAySee_CustomNodes
-RUN comfy-node-install was-node-suite-comfyui
-
-RUN comfy-node-install comfyui_essentials
-RUN comfy-node-install comfyui_custom_nodes_alekpet
+RUN comfy-node-install comfyui-in-context-lora-utils \
+    comfyui-kjnodes \
+    comfyui-logicutils \
+    comfyui-get-meta \
+    teacachehunyuanvideo \
+    comfy-mtb \
+    teacache \
+    ComfyUI_EmAySee_CustomNodes \
+    was-node-suite-comfyui \
+    comfyui_essentials \
+    comfyui_custom_nodes_alekpet
 
 # RUN comfy model download --url https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth --relative-path models/sams --filename sam_vit_h_4b8939.pth
 
