@@ -1,117 +1,12 @@
 import { useState, useRef, useEffect } from "react"
 import html2canvas from "html2canvas"
+import WORKFLOW_JSON from "./workflow.json";
 
-// 1. 重要：请将这里的示例JSON替换为您自己导出的 workflow_api.json 的内容
-const WORKFLOW_JSON = {
-  "3": {
-    "inputs": {
-      "seed": 870674015733204,
-      "steps": 20,
-      "cfg": 8,
-      "sampler_name": "euler",
-      "scheduler": "normal",
-      "denoise": 1,
-      "model": [
-        "4",
-        0
-      ],
-      "positive": [
-        "6",
-        0
-      ],
-      "negative": [
-        "7",
-        0
-      ],
-      "latent_image": [
-        "5",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "K采样器"
-    }
-  },
-  "4": {
-    "inputs": {
-      "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
-    },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {
-      "title": "Checkpoint加载器（简易）"
-    }
-  },
-  "5": {
-    "inputs": {
-      "width": 512,
-      "height": 512,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "空Latent图像"
-    }
-  },
-  "6": {
-    "inputs": {
-      "text": "masterpiece, best quality, a vision of paradise. unreal engine",
-      "clip": [
-        "4",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP文本编码"
-    }
-  },
-  "7": {
-    "inputs": {
-      "text": "text, watermark",
-      "clip": [
-        "4",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP文本编码"
-    }
-  },
-  "8": {
-    "inputs": {
-      "samples": [
-        "3",
-        0
-      ],
-      "vae": [
-        "4",
-        2
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE解码"
-    }
-  },
-  "9": {
-    "inputs": {
-      "filename_prefix": "ComfyUI_Plugin",
-      "images": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "保存图像"
-    }
-  }
-};
+// 1. 重要：这个工作流来自 demo.json
 
-// ComfyUI服务器地址
-const SERVER_ADDRESS = "127.0.0.1:8188";
+// Runpod API 配置
+const RUNPOD_API_BASE_URL = "https://api.runpod.ai/v2/f6nzcbpb48rzqq"; // 端点基础URL
+const RUNPOD_API_KEY = "rpa_9LWKFR8IM84PICOMYIDJSK2R2G3ITS5BYJCJFNOIisixtv"; // ！！！请务必替换为您的Runpod API密钥！！！
 
 // 一个简单的图片上传组件，现在增加了截图按钮
 function ImageUpload({ title, onImageSelect, selectedImage, onScreenshot }) {
@@ -153,17 +48,26 @@ function dataURLtoFile(dataurl, filename) {
   return new File([u8arr], filename, {type:mime});
 }
 
+// 新增：将File对象转换为Base64字符串的辅助函数
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result); // a data URL: "data:image/png;base64,iVBOR..."
+    reader.onerror = error => reject(error);
+  });
+}
+
 function IndexSidePanel() {
   const [personImage, setPersonImage] = useState(null);
   const [clothImage, setClothImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Ready to generate!");
   const [imageUrl, setImageUrl] = useState(null);
-  const [progress, setProgress] = useState(0);
   const [screenshotTarget, setScreenshotTarget] = useState(null); // 'person' or 'cloth'
-
-  const ws = useRef(null);
-
+  
+  // 移除了jobId和pollIntervalRef，因为同步模式不需要它们
+  
   useEffect(() => {
     const messageListener = (message) => {
       if (message.type === "screenshot_ready" && screenshotTarget) {
@@ -178,7 +82,11 @@ function IndexSidePanel() {
       }
     };
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+
+    // 组件卸载时
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+    };
   }, [screenshotTarget]);
 
   const handleStartScreenshot = (target) => {
@@ -186,134 +94,98 @@ function IndexSidePanel() {
     chrome.runtime.sendMessage({ type: "start_screenshot" });
   };
 
-  // 获取图片函数
-  const getImage = async (filename, subfolder, folderType) => {
-    try {
-      const response = await fetch(
-        `http://${SERVER_ADDRESS}/view?filename=${encodeURIComponent(
-          filename
-        )}&subfolder=${encodeURIComponent(
-          subfolder
-        )}&type=${encodeURIComponent(folderType)}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch image");
-      }
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
-    } catch (error) {
-      console.error("Error fetching image:", error);
-      setMessage(`Error fetching image: ${error.message}`);
-      return null;
-    }
-  };
-
-  const listenForImage = (promptId, clientId) => {
-    ws.current = new WebSocket(`ws://${SERVER_ADDRESS}/ws?clientId=${clientId}`);
-
-    ws.current.onopen = () => {
-      console.log("WebSocket connection established with server.");
-      setMessage("Connection open. Waiting for task updates...");
-    };
-
-    ws.current.onerror = (error) => {
-      console.error("WebSocket Error:", error);
-      setMessage("Error connecting to server. See console for details.");
-      setLoading(false);
-    };
-
-    ws.current.onclose = (event) => {
-      console.log("WebSocket connection closed:", event.code, event.reason);
-      // Only set loading to false on error or success, so we don't prematurely stop.
-    };
-
-    ws.current.onmessage = async (event) => {
-      console.log("Received WebSocket message:", event.data);
-      const data = JSON.parse(event.data);
-      switch (data.type) {
-        case "status":
-          setMessage(`Queue: ${data.data.status.exec_info.queue_remaining}`);
-          break;
-        
-        case "progress":
-          const { value, max } = data.data;
-          const percentage = Math.round((value / max) * 100);
-          setProgress(percentage);
-          setMessage(`Processing... ${percentage}%`);
-          break;
-
-        case "executed":
-          // --- DEBUGGING START ---
-          // 检查收到的"executed"消息是否符合我们的预期
-          console.log(`Node ${data.data.node} executed. Output exists:`, 'output' in data.data, data.data.output ? 'images' in data.data.output : 'N/A');
-          // --- DEBUGGING END ---
-
-          if (data.data.node === "9" && data.data.output.images) {
-            setMessage("Image generated! Fetching...");
-            const imageData = data.data.output.images[0];
-            const url = await getImage(
-              imageData.filename,
-              imageData.subfolder,
-              imageData.type
-            );
-            if (url) {
-              setImageUrl(url);
-              setMessage("Done!");
-            }
-            setLoading(false);
-            ws.current.close();
-          }
-          break;
-        
-        case "executing":
-          // 这个信号是任务完成的最终信号，无论成功与否
-          if (data.data.node === null && data.data.prompt_id === promptId) {
-            // 检查此时是否已经成功生成了图片。如果没有，说明流程结束但未产出图片。
-            if (!imageUrl) {
-              setMessage("Task finished, but no image was generated.");
-            }
-            setLoading(false);
-            ws.current.close();
-          }
-          break;
-
-        default:
-          break;
-      }
-    };
-  };
-
-  // 点击生成按钮的处理函数
+  // 点击生成按钮的处理函数 - 已更新为Runpod /runsync 逻辑
   const handleGenerate = async () => {
     if (!personImage || !clothImage) {
       setMessage("Please upload both a person and a clothing image.");
       return;
     }
-    // The logic for uploading images and modifying the workflow will go here.
-    // For now, we'll just log a message.
-    console.log("Generate clicked with two images:", personImage.name, clothImage.name);
-    setMessage("Image upload and new workflow logic is not implemented yet.");
-  };
+    // API密钥已设置，移除此处的检查
+    /*
+    if (RUNPOD_API_KEY === "PLEASE_REPLACE_WITH_YOUR_RUNPOD_API_KEY") {
+      setMessage("错误：请在代码中设置您的 Runpod API 密钥!");
+      return;
+    }
+    */
 
-  async function handleStop() {
-    console.log("Sending interrupt request...");
+    setLoading(true);
+    setImageUrl(null);
+    setMessage("Preparing images and workflow...");
+
     try {
-      const response = await fetch(`http://${SERVER_ADDRESS}/interrupt`, {
-        method: "POST"
+      // 1. 将图片文件转换为Base64
+      const personImageBase64 = await fileToBase64(personImage);
+      const clothImageBase64 = await fileToBase64(clothImage);
+
+      // 2. 准备工作流和输入
+      // 深拷贝一份工作流以安全地修改
+      const workflow = JSON.parse(JSON.stringify(WORKFLOW_JSON));
+      
+      // 定义图片在工作流中的引用名称
+      const personImageFilename = "person_image.png";
+      const clothImageFilename = "cloth_image.png";
+
+      // 关键：将工作流中的LoadImage节点的输入指向我们即将上传的图片文件名
+      // 节点 "74" 对应人物图片, "75" 对应服装图片
+      workflow["74"].inputs.image = personImageFilename;
+      workflow["75"].inputs.image = clothImageFilename;
+
+      // 3. 构建符合Runpod API规范的请求体
+      const body = {
+        input: {
+          workflow: workflow,
+          images: [
+            { name: personImageFilename, image: personImageBase64 },
+            { name: clothImageFilename, image: clothImageBase64 },
+          ]
+        }
+      };
+
+      setMessage("Sending job to Runpod... This may take a while.");
+
+      // 4. 发送同步请求到 /runsync
+      const response = await fetch(`${RUNPOD_API_BASE_URL}/runsync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${RUNPOD_API_KEY}`
+        },
+        body: JSON.stringify(body)
       });
-      if (response.ok) {
-        setMessage("Interruption requested.");
-        console.log("Interrupt request successful.");
-      } else {
-        throw new Error(`Failed to interrupt: ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
       }
+      
+      const result = await response.json();
+      
+      // 5. 处理返回结果
+      if (result.status === "COMPLETED") {
+        setMessage("Job completed! Displaying image.");
+        // 从返回的output中提取第一个图片的base64数据
+        const outputImage = result.output.images[0];
+        if (outputImage && outputImage.type === "base64") {
+          const resultUrl = `data:image/png;base64,${outputImage.data}`;
+          setImageUrl(resultUrl);
+        } else {
+          throw new Error("No base64 image found in the output.");
+        }
+      } else {
+        // 如果任务失败或有其他状态
+        throw new Error(`Job failed with status: ${result.status}. Full response: ${JSON.stringify(result)}`);
+      }
+
     } catch (error) {
-      console.error("Interrupt error:", error);
-      setMessage(`Interrupt error: ${error.message}`);
+      console.error("Generation failed:", error);
+      setMessage(`Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  // 在同步模式下，Stop按钮没有意义，暂时移除其功能
+  // async function handleStop() { ... }
 
   return (
     <div
@@ -332,20 +204,23 @@ function IndexSidePanel() {
 
       <div style={{display: "flex", gap: "8px"}}>
         <button onClick={handleGenerate} disabled={loading || !personImage || !clothImage} style={{flex: 1}}>
-          Generate
+          {loading ? "Generating..." : "Generate"}
         </button>
+        {/* 同步模式下不显示Stop按钮
         {loading && (
           <button onClick={handleStop} style={{flex: 1, backgroundColor: "#6c757d", color: "white", border: "none"}}>
             Stop
-          </button>
+      </button>
         )}
+        */}
       </div>
 
       {loading && (
         <div style={{width: "100%"}}>
           <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
           <div style={{backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
-            <div style={{width: `${progress}%`, height: "10px", backgroundColor: "#007bff", transition: "width 0.2s"}}></div>
+            {/* 轮询时，我们可以用一个不确定的动画来表示加载 */}
+            <div style={{width: `100%`, height: "10px", backgroundColor: "#007bff", animation: "pulse 2s infinite ease-in-out"}}></div>
           </div>
         </div>
       )}
