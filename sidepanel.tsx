@@ -127,8 +127,8 @@ function IndexSidePanel() {
 
       // 关键：将工作流中的LoadImage节点的输入指向我们即将上传的图片文件名
       // 节点 "74" 对应人物图片, "75" 对应服装图片
-      workflow["74"].inputs.image = personImageFilename;
-      workflow["75"].inputs.image = clothImageFilename;
+      // workflow["74"].inputs.image = personImageFilename;
+      // workflow["75"].inputs.image = clothImageFilename;
 
       // 3. 构建符合Runpod API规范的请求体
       const body = {

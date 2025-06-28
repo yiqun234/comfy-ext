@@ -1,7 +1,7 @@
 {
   "3": {
     "inputs": {
-      "seed": 1046816651,
+      "seed": 566591154504382,
       "steps": 30,
       "cfg": 1,
       "sampler_name": "euler",
@@ -181,7 +181,7 @@
     },
     "class_type": "LayerMask: SegmentAnythingUltra V2",
     "_meta": {
-      "title": "图层遮罩：SegmentAnything Ultra V2（高级）"
+      "title": "LayerMask: SegmentAnythingUltra V2"
     }
   },
   "48": {
@@ -304,7 +304,7 @@
     },
     "class_type": "LayerMask: PersonMaskUltra V2",
     "_meta": {
-      "title": "图层遮罩：人物遮罩 Ultra V2（高级）"
+      "title": "LayerMask: PersonMaskUltra V2"
     }
   },
   "57": {
@@ -384,7 +384,7 @@
     },
     "class_type": "LayerMask: SegmentAnythingUltra V2",
     "_meta": {
-      "title": "图层遮罩：SegmentAnything Ultra V2（高级）"
+      "title": "LayerMask: SegmentAnythingUltra V2"
     }
   },
   "62": {
@@ -529,7 +529,7 @@
   },
   "74": {
     "inputs": {
-      "image": "微信截图_20250616143920.png"
+      "image": "counselor-avatar.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -538,7 +538,7 @@
   },
   "75": {
     "inputs": {
-      "image": "微信截图_20250619151742.png"
+      "image": "avatar.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -573,7 +573,7 @@
   },
   "77": {
     "inputs": {
-      "text": "",
+      "text": "一张全身照片，年轻女性，站在城市街道上，时尚杂志风格，高清，服装细节丰富，光线自然\n",
       "speak_and_recognation": {
         "__value__": [
           false,
