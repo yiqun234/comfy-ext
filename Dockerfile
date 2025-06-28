@@ -30,3 +30,13 @@ RUN comfy model download --url https://dl.fbaipublicfiles.com/segment_anything/s
 
 RUN comfy model download --url https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth --relative-path models/grounding-dino --filename groundingdino_swint_ogc.pth
 
+RUN comfy model download \
+  --url https://huggingface.co/jackzheng/flux-fill-FP8/resolve/main/fluxFillFP8_v10.safetensors \
+  --relative-path models/unet \
+  --filename fluxFillFP8_v10.safetensors
+
+RUN comfy model download \
+  --url https://huggingface.co/zhengchong/CatVTON/resolve/main/flux-lora/pytorch_lora_weights.safetensors \
+  --relative-path models/loras \
+  --filename catvton-flux-lora.safetensors
+
