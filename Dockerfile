@@ -18,9 +18,9 @@ RUN comfy-node-install comfyui-manager \
     comfyui-kjnodes \
     comfyui-logicutils \
     comfyui-get-meta \
-    teacachehunyuanvideo \
+    # teacachehunyuanvideo \
     comfy-mtb \
-    teacache \
+    # teacache \
     ComfyUI_EmAySee_CustomNodes \
     was-node-suite-comfyui \
     comfyui_essentials \
