@@ -5,7 +5,7 @@ import WORKFLOW_JSON from "./workflow.json";
 // 1. 重要：这个工作流来自 demo.json
 
 // Runpod API 配置
-const RUNPOD_API_BASE_URL = "https://api.runpod.ai/v2/f6nzcbpb48rzqq"; // 端点基础URL
+const RUNPOD_API_BASE_URL = "https://api.runpod.ai/v2/v27y22sccjt0kf"; // 端点基础URL
 const RUNPOD_API_KEY = "rpa_9LWKFR8IM84PICOMYIDJSK2R2G3ITS5BYJCJFNOIisixtv"; // ！！！请务必替换为您的Runpod API密钥！！！
 
 // 一个简单的图片上传组件，现在增加了截图按钮
