@@ -12,10 +12,9 @@ ENV CC=/usr/bin/gcc
 # 3. 安装所有自定义节点 (优化结构：每个节点独立一行)
 # ------------------------------------------------------------------
 # 这种写法可以最大化利用Docker的构建缓存，并使排错更容易。
-RUN comfy-node-install comfyui-manager
-RUN comfy-node-install comfyui_layerstyle
-
-RUN comfy-node-install comfyui-in-context-lora-utils \
+RUN comfy-node-install comfyui-manager \
+    comfyui_layerstyle \
+    comfyui-in-context-lora-utils \
     comfyui-kjnodes \
     comfyui-logicutils \
     comfyui-get-meta \
