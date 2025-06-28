@@ -1,14 +1,14 @@
 {
   "3": {
     "inputs": {
-      "seed": 779983376628174,
+      "seed": 1046816651,
       "steps": 30,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "90",
+        "69",
         0
       ],
       "positive": [
@@ -636,23 +636,6 @@
     "class_type": "GrowMaskWithBlur",
     "_meta": {
       "title": "Grow Mask With Blur"
-    }
-  },
-  "90": {
-    "inputs": {
-      "model_type": "flux",
-      "rel_l1_thresh": 0.4,
-      "start_percent": 0,
-      "end_percent": 1,
-      "cache_device": "cuda",
-      "model": [
-        "69",
-        0
-      ]
-    },
-    "class_type": "TeaCache",
-    "_meta": {
-      "title": "TeaCache"
     }
   }
 }

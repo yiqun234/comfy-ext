@@ -26,5 +26,7 @@ RUN comfy-node-install comfyui-manager \
     comfyui_essentials \
     comfyui_custom_nodes_alekpet
 
-# RUN comfy model download --url https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth --relative-path models/sams --filename sam_vit_h_4b8939.pth
+RUN comfy model download --url https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth --relative-path models/sams --filename sam_vit_h_4b8939.pth
+
+RUN comfy model download --url https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth --relative-path models/grounding-dino --filename groundingdino_swint_ogc.pth
 
