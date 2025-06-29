@@ -64,10 +64,85 @@ function IndexSidePanel() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Ready to generate!");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [screenshotTarget, setScreenshotTarget] = useState(null); // 'person' or 'cloth'
+  const [screenshotTarget, setScreenshotTarget] = useState(null);
+  const [jobId, setJobId] = useState(null);
+  const pollIntervalRef = useRef(null);
   
-  // 移除了jobId和pollIntervalRef，因为同步模式不需要它们
-  
+  // Helper to stop polling
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  // Process the final result of a job
+  const handleJobCompletion = (result) => {
+    stopPolling();
+    setJobId(null);
+    setLoading(false);
+
+    if (result.status === "COMPLETED") {
+      const outputImages = result.output?.images;
+      if (outputImages && outputImages.length > 0) {
+        const urls = outputImages
+          .filter(img => img.type === "base64" && img.data)
+          .map(img => `data:image/png;base64,${img.data}`);
+        
+        if (urls.length > 0) {
+          setImageUrls(urls);
+          setMessage(`Job completed! Displaying ${urls.length} image(s).`);
+        } else {
+          setMessage("Job completed, but the workflow produced no displayable images.");
+        }
+      } else {
+        setMessage("Job completed, but the workflow produced no images.");
+      }
+    } else { // FAILED or CANCELLED
+      const errorTitle = result.error || "Job failed or was cancelled";
+      let errorDetails = `Status: ${result.status}.`;
+      if (result.output?.details) {
+        errorDetails = result.output.details.join('\\n');
+      }
+      setMessage(`${errorTitle}\\n\\n${errorDetails}`);
+    }
+  };
+
+  // Check the status of a running job
+  const checkStatus = async (id) => {
+    try {
+      const response = await fetch(`${RUNPOD_API_BASE_URL}/status/${id}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RUNPOD_API_KEY}` }
+      });
+
+      if (!response.ok) {
+        console.error("Polling failed, will retry.", await response.text());
+        return; // Don't stop polling on a single failed check
+      }
+
+      const result = await response.json();
+      if (["COMPLETED", "FAILED", "CANCELLED"].includes(result.status)) {
+        handleJobCompletion(result);
+      } else if (result.status === "IN_PROGRESS") {
+        setMessage(`Job in progress... (Execution time: ${result.executionTime}ms)`);
+      } else if (result.status === "IN_QUEUE") {
+        setMessage("Job is in queue, waiting for a worker...");
+      }
+    } catch (error) {
+      console.error("Error checking status:", error);
+      setMessage(`Error polling status: ${error.message}`);
+      stopPolling();
+      setLoading(false);
+    }
+  };
+
+  // Start polling for a job ID
+  const startPolling = (id) => {
+    stopPolling(); // Ensure no multiple polls are running
+    pollIntervalRef.current = setInterval(() => checkStatus(id), 3000);
+  };
+
   useEffect(() => {
     const messageListener = (message) => {
       if (message.type === "screenshot_ready" && screenshotTarget) {
@@ -83,9 +158,10 @@ function IndexSidePanel() {
     };
     chrome.runtime.onMessage.addListener(messageListener);
 
-    // 组件卸载时
+    // Cleanup on component unmount
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
+      stopPolling();
     };
   }, [screenshotTarget]);
 
@@ -110,6 +186,7 @@ function IndexSidePanel() {
 
     setLoading(true);
     setImageUrls([]);
+    setJobId(null);
     setMessage("Preparing images and workflow...");
 
     try {
@@ -153,6 +230,7 @@ function IndexSidePanel() {
         body: JSON.stringify(body)
       });
 
+      // runsync can fail immediately for bad inputs
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -161,40 +239,53 @@ function IndexSidePanel() {
       const result = await response.json();
       
       // 5. 处理返回结果
-      if (result.status === "COMPLETED") {
-        // 从返回的output中提取所有图片的base64数据
-        const outputImages = result.output.images;
-        if (outputImages && outputImages.length > 0) {
-          const urls = outputImages
-            .filter(img => img.type === "base64")
-            .map(img => `data:image/png;base64,${img.data}`);
-          
-          if (urls.length > 0) {
-            setImageUrls(urls);
-            setMessage(`Job completed! Displaying ${urls.length} image(s).`);
-          } else {
-            setMessage("Job completed, but no images were produced.");
-            // 这里可以不抛出错误，因为工作流可能就是没有图片输出（例如，只输出文本）
-          }
-        } else {
-          setMessage("Job completed, but no images were produced.");
-          // 这里可以不抛出错误，因为工作流可能就是没有图片输出（例如，只输出文本）
-        }
-      } else {
-        // 如果任务失败或有其他状态
-        throw new Error(`Job failed with status: ${result.status}. Full response: ${JSON.stringify(result)}`);
+      switch (result.status) {
+        case "COMPLETED":
+        case "FAILED":
+        case "CANCELLED":
+          handleJobCompletion(result);
+          break;
+        case "IN_QUEUE":
+          setMessage("Job is in queue, waiting for a worker...");
+          setJobId(result.id);
+          startPolling(result.id);
+          break;
+        case "IN_PROGRESS":
+          setMessage("Job in progress, starting to poll status...");
+          setJobId(result.id);
+          startPolling(result.id);
+          break;
+        default:
+          throw new Error(`Unhandled status: ${result.status}. Full response: ${JSON.stringify(result, null, 2)}`);
       }
 
     } catch (error) {
       console.error("Generation failed:", error);
       setMessage(`Error: ${error.message}`);
-    } finally {
       setLoading(false);
     }
   };
 
-  // 在同步模式下，Stop按钮没有意义，暂时移除其功能
-  // async function handleStop() { ... }
+  // handleStop to cancel a job
+  const handleStop = async () => {
+    if (!jobId) return;
+    setMessage("Attempting to cancel job...");
+    stopPolling(); // Stop polling immediately
+    try {
+      const response = await fetch(`${RUNPOD_API_BASE_URL}/cancel/${jobId}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RUNPOD_API_KEY}` }
+      });
+      const result = await response.json();
+      // Directly handle the cancellation result
+      handleJobCompletion(result);
+    } catch(error) {
+      console.error("Failed to send cancel request:", error);
+      setMessage(`Error cancelling job: ${error.message}`);
+      setLoading(false); // Also stop loading on cancel failure
+    }
+    setJobId(null);
+  };
 
   return (
     <div
@@ -215,13 +306,11 @@ function IndexSidePanel() {
         <button onClick={handleGenerate} disabled={loading || !personImage || !clothImage} style={{flex: 1}}>
           {loading ? "Generating..." : "Generate"}
         </button>
-        {/* 同步模式下不显示Stop按钮
-        {loading && (
+        {loading && jobId && (
           <button onClick={handleStop} style={{flex: 1, backgroundColor: "#6c757d", color: "white", border: "none"}}>
             Stop
-      </button>
+          </button>
         )}
-        */}
       </div>
 
       {loading && (
@@ -240,6 +329,13 @@ function IndexSidePanel() {
           {imageUrls.map((url, index) => (
             <img key={index} src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
           ))}
+        </div>
+      )}
+
+      {/* 新增：当没有在加载且没有图片时，显示状态或错误信息 */}
+      {!loading && imageUrls.length === 0 && (
+        <div style={{width: "100%"}}>
+          <p style={{margin: 0, fontSize: "12px", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message}</p>
         </div>
       )}
     </div>
