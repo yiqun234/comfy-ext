@@ -529,7 +529,7 @@
   },
   "74": {
     "inputs": {
-      "image": "counselor-avatar.png"
+      "image": "person_image.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -538,7 +538,7 @@
   },
   "75": {
     "inputs": {
-      "image": "avatar.png"
+      "image": "cloth_image.png"
     },
     "class_type": "LoadImage",
     "_meta": {

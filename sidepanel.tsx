@@ -63,7 +63,7 @@ function IndexSidePanel() {
   const [clothImage, setClothImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Ready to generate!");
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [screenshotTarget, setScreenshotTarget] = useState(null); // 'person' or 'cloth'
   
   // 移除了jobId和pollIntervalRef，因为同步模式不需要它们
@@ -109,7 +109,7 @@ function IndexSidePanel() {
     */
 
     setLoading(true);
-    setImageUrl(null);
+    setImageUrls([]);
     setMessage("Preparing images and workflow...");
 
     try {
@@ -162,14 +162,23 @@ function IndexSidePanel() {
       
       // 5. 处理返回结果
       if (result.status === "COMPLETED") {
-        setMessage("Job completed! Displaying image.");
-        // 从返回的output中提取第一个图片的base64数据
-        const outputImage = result.output.images[0];
-        if (outputImage && outputImage.type === "base64") {
-          const resultUrl = `data:image/png;base64,${outputImage.data}`;
-          setImageUrl(resultUrl);
+        // 从返回的output中提取所有图片的base64数据
+        const outputImages = result.output.images;
+        if (outputImages && outputImages.length > 0) {
+          const urls = outputImages
+            .filter(img => img.type === "base64")
+            .map(img => `data:image/png;base64,${img.data}`);
+          
+          if (urls.length > 0) {
+            setImageUrls(urls);
+            setMessage(`Job completed! Displaying ${urls.length} image(s).`);
+          } else {
+            setMessage("Job completed, but no images were produced.");
+            // 这里可以不抛出错误，因为工作流可能就是没有图片输出（例如，只输出文本）
+          }
         } else {
-          throw new Error("No base64 image found in the output.");
+          setMessage("Job completed, but no images were produced.");
+          // 这里可以不抛出错误，因为工作流可能就是没有图片输出（例如，只输出文本）
         }
       } else {
         // 如果任务失败或有其他状态
@@ -218,17 +227,19 @@ function IndexSidePanel() {
       {loading && (
         <div style={{width: "100%"}}>
           <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
-          <div style={{backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
+          <div style={{width: "100%", backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
             {/* 轮询时，我们可以用一个不确定的动画来表示加载 */}
             <div style={{width: `100%`, height: "10px", backgroundColor: "#007bff", animation: "pulse 2s infinite ease-in-out"}}></div>
           </div>
         </div>
       )}
 
-      {!loading && imageUrl && (
+      {!loading && imageUrls.length > 0 && (
         <div>
           <p>Result:</p>
-          <img src={imageUrl} alt="Generated result" style={{ width: "100%", height: "auto", borderRadius: "4px" }} />
+          {imageUrls.map((url, index) => (
+            <img key={index} src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
+          ))}
         </div>
       )}
     </div>
