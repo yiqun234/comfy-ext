@@ -529,7 +529,7 @@
   },
   "74": {
     "inputs": {
-      "image": "person_image.png"
+      "image": "cloth_image.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -538,7 +538,7 @@
   },
   "75": {
     "inputs": {
-      "image": "cloth_image.png"
+      "image": "person_image.png"
     },
     "class_type": "LoadImage",
     "_meta": {
