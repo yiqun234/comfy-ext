@@ -10,6 +10,8 @@
     "package": "plasmo package"
   },
   "dependencies": {
+    "@plasmohq/storage": "^1.15.0",
+    "firebase": "^11.10.0",
     "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -32,10 +34,18 @@
       "activeTab",
       "scripting",
       "storage",
-      "clipboardRead"
+      "clipboardRead",
+      "identity"
     ],
     "background": {
       "service_worker": "background.ts"
+    },
+    "oauth2": {
+      "client_id": "469413583358-edoba5aqp8g781eadpl7dakb2931q7ak.apps.googleusercontent.com",
+      "scopes": [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile"
+      ]
     }
   },
   "packageManager": "pnpm@10.12.1+sha512.f0dda8580f0ee9481c5c79a1d927b9164f2c478e90992ad268bbb2465a736984391d6333d2c327913578b2804af33474ca554ba29c04a8b13060a717675ae3ac"

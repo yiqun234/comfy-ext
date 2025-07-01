@@ -1,5 +1,17 @@
 import { useState, useRef, useEffect } from "react"
 import WORKFLOW_JSON from "./workflow.json";
+import { 
+  auth, 
+  db,
+  doc,
+  setDoc,
+  onAuthStateChanged, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from "./firebase";
+import type { User } from "firebase/auth";
+import { Storage } from "@plasmohq/storage";
 
 // 1. 重要：这个工作流来自 demo.json
 
@@ -178,14 +190,91 @@ function fileToBase64(file) {
 }
 
 function IndexSidePanel() {
+  const [user, setUser] = useState<User | null>(null); // To hold user auth state
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
   const [personImage, setPersonImage] = useState(null);
   const [clothImage, setClothImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("Ready to generate!");
+  const [message, setMessage] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [jobId, setJobId] = useState(null);
   const pollIntervalRef = useRef(null);
   
+  // Listen for auth state changes from Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 点击外部关闭用户菜单
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef]);
+
+  // 新增: 处理邮箱/密码注册
+  const handleRegister = async () => {
+    if (!email || !password) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // 在 Firestore 中为新用户创建文档
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        email: userCredential.user.email,
+        createdAt: new Date()
+      });
+      // onAuthStateChanged 会自动处理登录状态
+    } catch (error) {
+      console.error("Registration failed:", error);
+      setMessage(error.message); // 显示Firebase返回的错误信息
+    }
+    setLoading(false);
+  };
+
+  // 新增: 处理邮箱/密码登录
+  const handleEmailSignIn = async () => {
+    if (!email || !password) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged 会自动处理登录状态
+    } catch (error) {
+      console.error("Sign in failed:", error);
+      setMessage(error.message); // 显示Firebase返回的错误信息
+    }
+    setLoading(false);
+  };
+
+  // Handle Sign-Out
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
+  };
+
   // Helper to stop polling
   const stopPolling = () => {
     if (pollIntervalRef.current) {
@@ -399,55 +488,153 @@ function IndexSidePanel() {
           80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
           100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
         }
+        .auth-container { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .user-info img { width: 32px; height: 32px; border-radius: 50%; }
+        .auth-button { padding: 8px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; }
+        .signin-button { background-color: #4285F4; }
+        .signout-button { background-color: #6c757d; }
+        .form-container { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+        .form-container input { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        .form-container button { background-color: #007bff; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; }
+        .form-container button:disabled { background-color: #6c757d; }
+        .toggle-auth-button { 
+          background: none; 
+          border: none; 
+          color: #007bff; 
+          cursor: pointer; 
+          margin-top: 8px; 
+          text-align: center; 
+          padding: 4px;
+          font-size: 14px;
+        }
+
+        .user-menu-container { position: relative; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid #ddd; }
+        .user-dropdown {
+          position: absolute;
+          top: 50px;
+          right: 0;
+          background-color: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          z-index: 100;
+          width: 200px;
+          padding: 8px;
+        }
+        .dropdown-email {
+          font-size: 14px;
+          color: #333;
+          margin: 0;
+          padding: 8px;
+          border-bottom: 1px solid #eee;
+          word-break: break-all;
+        }
+        .dropdown-signout-button {
+          background-color: transparent;
+          border: none;
+          color: #dc3545;
+          padding: 10px 8px;
+          width: 100%;
+          text-align: left;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .dropdown-signout-button:hover { background-color: #f8f9fa; }
       `}</style>
       
-      <h2>Virtual Try-On</h2>
-      
-      <ImageUpload title="Person Image" onImageSelect={setPersonImage} selectedImage={personImage} />
-      <ImageUpload title="Clothing Image" onImageSelect={setClothImage} selectedImage={clothImage} />
-
-      <div style={{display: "flex", gap: "8px"}}>
-        <button onClick={handleGenerate} disabled={loading || !personImage || !clothImage} style={{flex: 1}}>
-          {loading ? "Generating..." : "Generate"}
-        </button>
-        {loading && jobId && (
-          <button onClick={handleStop} style={{flex: 1, backgroundColor: "#6c757d", color: "white", border: "none"}}>
-            Stop
-          </button>
+      <div className="auth-container">
+        <h2>Virtual Try-On</h2>
+        {user && (
+          <div className="user-menu-container" ref={dropdownRef}>
+            <img 
+              src={user.photoURL || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.uid}`} 
+              alt="User Avatar"
+              className="user-avatar"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            />
+            {isDropdownOpen && (
+              <div className="user-dropdown">
+                <p className="dropdown-email">{user.email}</p>
+                <button onClick={handleSignOut} className="dropdown-signout-button">Sign Out</button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {loading && (
-        <div style={{width: "100%"}}>
-          <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
-          <div style={{width: "100%", backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
-            {/* 轮询时，我们可以用一个不确定的动画来表示加载 */}
-            <div style={{width: `100%`, height: "10px", backgroundColor: "#007bff", animation: "pulse 2s infinite ease-in-out"}}></div>
-          </div>
-        </div>
-      )}
+      {user ? (
+        <>
+          <ImageUpload title="Person Image" onImageSelect={setPersonImage} selectedImage={personImage} />
+          <ImageUpload title="Clothing Image" onImageSelect={setClothImage} selectedImage={clothImage} />
 
-      {!loading && imageUrls.length > 0 && (
-        <div>
-          <p>Result:</p>
-          {imageUrls.map((url, index) => (
-            <div key={index} style={{ marginBottom: "16px", textAlign: "center" }}>
-              <img src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
-              <button 
-                onClick={() => handleSaveImage(url, `result-${index + 1}.png`)}
-                style={{padding: "8px 16px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px", background: "transparent", cursor: "pointer"}}
-              >
-                Save Image
+          <div style={{display: "flex", gap: "8px"}}>
+            <button onClick={handleGenerate} disabled={loading || !personImage || !clothImage} style={{flex: 1}}>
+              {loading ? "Generating..." : "Generate"}
+            </button>
+            {loading && jobId && (
+              <button onClick={handleStop} style={{flex: 1, backgroundColor: "#6c757d", color: "white", border: "none"}}>
+                Stop
               </button>
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+          </div>
 
-      {/* 新增：当没有在加载且没有图片时，显示状态或错误信息 */}
-      {!loading && imageUrls.length === 0 && (
-        <div style={{width: "100%"}}>
-          <p style={{margin: 0, fontSize: "12px", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message}</p>
+          {loading && (
+            <div style={{width: "100%"}}>
+              <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
+              <div style={{width: "100%", backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
+                <div style={{width: `100%`, height: "10px", backgroundColor: "#007bff", animation: "pulse 2s infinite ease-in-out"}}></div>
+              </div>
+            </div>
+          )}
+
+          {!loading && imageUrls.length > 0 && (
+            <div>
+              <p>Result:</p>
+              {imageUrls.map((url, index) => (
+                <div key={index} style={{ marginBottom: "16px", textAlign: "center" }}>
+                  <img src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
+                  <button 
+                    onClick={() => handleSaveImage(url, `result-${index + 1}.png`)}
+                    style={{padding: "8px 16px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px", background: "transparent", cursor: "pointer"}}
+                  >
+                    Save Image
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && imageUrls.length === 0 && (
+            <div style={{width: "100%"}}>
+              <p style={{margin: 0, fontSize: "12px", whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message}</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="form-container">
+          <h3>{isRegistering ? "Register New Account" : "Sign In"}</h3>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email Address"
+            autoComplete="email"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoComplete={isRegistering ? "new-password" : "current-password"}
+          />
+          <button onClick={isRegistering ? handleRegister : handleEmailSignIn} disabled={loading}>
+            {loading ? "..." : (isRegistering ? "Register" : "Sign In")}
+          </button>
+          <button onClick={() => setIsRegistering(!isRegistering)} className="toggle-auth-button">
+            {isRegistering ? "Already have an account? Sign In" : "Need an account? Register"}
+          </button>
+          {message && <p style={{color: 'red', fontSize: '12px', textAlign: 'center'}}>{message}</p>}
         </div>
       )}
     </div>
