@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react"
-import html2canvas from "html2canvas"
 import WORKFLOW_JSON from "./workflow.json";
 
 // 1. 重要：这个工作流来自 demo.json
@@ -8,8 +7,13 @@ import WORKFLOW_JSON from "./workflow.json";
 const RUNPOD_API_BASE_URL = "https://api.runpod.ai/v2/v27y22sccjt0kf"; // 端点基础URL
 const RUNPOD_API_KEY = process.env.PLASMO_PUBLIC_RUNPOD_API_KEY;
 
-// 一个简单的图片上传组件，现在增加了截图按钮
-function ImageUpload({ title, onImageSelect, selectedImage, onScreenshot }) {
+// 一个简单的图片上传组件，现在支持粘贴和拖拽功能
+function ImageUpload({ title, onImageSelect, selectedImage }) {
+  const [pasteSuccess, setPasteSuccess] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+  const dragCounter = useRef(0); // Ref to count drag enter/leave events
+
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -17,23 +21,138 @@ function ImageUpload({ title, onImageSelect, selectedImage, onScreenshot }) {
     }
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Necessary to allow drop
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0; // Reset counter on drop
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        onImageSelect(file);
+      } else {
+        alert("Please drop an image file.");
+      }
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const clipboardItem of clipboardItems) {
+        for (const type of clipboardItem.types) {
+          if (type.startsWith('image/')) {
+            const blob = await clipboardItem.getType(type);
+            const file = new File([blob], `pasted-image.${type.split('/')[1]}`, { type });
+            onImageSelect(file);
+            
+            // Show paste success message
+            setPasteSuccess(true);
+            setTimeout(() => setPasteSuccess(false), 2000);
+            return;
+          }
+        }
+      }
+      // If no image is found
+      alert('No image found in the clipboard. Please copy an image first.');
+    } catch (error) {
+      console.error('Paste failed:', error);
+      alert('Paste failed. Please make sure an image is copied to the clipboard.');
+    }
+  };
+
+  const dropZoneStyle: React.CSSProperties = {
+    border: `2px dashed ${isDragging ? '#28a745' : '#ccc'}`, // Highlight border on drag
+    borderRadius: "4px", 
+    padding: "8px", 
+    textAlign: "center", 
+    position: "relative",
+    transition: 'border-color 0.2s ease-in-out' // Smooth transition for border color
+  };
+
   return (
-    <div style={{ border: "1px solid #ccc", borderRadius: "4px", padding: "8px", textAlign: "center" }}>
+    <div 
+      style={dropZoneStyle}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <p style={{ margin: 0, fontWeight: "bold" }}>{title}</p>
       {selectedImage ? (
-        <img src={typeof selectedImage === 'string' ? selectedImage : URL.createObjectURL(selectedImage)} alt="Preview" style={{ width: "100%", height: "auto", marginTop: "8px" }} />
+        <div style={{ width: "100%", height: "200px", marginTop: "8px", border: "1px solid #ddd", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <img 
+            src={typeof selectedImage === 'string' ? selectedImage : URL.createObjectURL(selectedImage)} 
+            alt="Preview" 
+            style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+          />
+        </div>
       ) : (
-        <p style={{ color: "#888", marginTop: "8px" }}>Upload or Screenshot</p>
+        <div style={{ width: "100%", height: "200px", marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ color: "#888", pointerEvents: "none" }}>Upload, Paste or Drag & Drop Image</p>
+        </div>
       )}
+      
+      {/* 粘贴成功提示 */}
+      {pasteSuccess && (
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          backgroundColor: "#28a745",
+          color: "white",
+          padding: "8px 16px",
+          borderRadius: "4px",
+          fontSize: "14px",
+          zIndex: 1000,
+          animation: "fadeInOut 2s ease-in-out"
+        }}>
+          ✓ Pasted!
+        </div>
+      )}
+      
       <div style={{display: "flex", gap: "8px", marginTop: "8px"}}>
         <label htmlFor={`file-upload-${title}`} style={{ cursor: "pointer", display: "block", flex: 1, padding: "8px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px" }}>
           {selectedImage ? "Change" : "Upload"}
         </label>
-        <button onClick={onScreenshot} style={{flex: 1, border: "1px solid #17a2b8", background: "transparent", color: "#17a2b8", borderRadius: "4px"}}>
-          Screenshot
+        <button onClick={handlePaste} style={{flex: 1, border: "1px solid #28a745", background: "transparent", color: "#28a745", borderRadius: "4px"}}>
+          Paste
         </button>
       </div>
-      <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} id={`file-upload-${title}`} />
+      <input 
+        ref={fileInputRef}
+        type="file" 
+        accept="image/*" 
+        onChange={handleFileChange} 
+        style={{ display: "none" }} 
+        id={`file-upload-${title}`} 
+      />
     </div>
   );
 }
@@ -64,7 +183,6 @@ function IndexSidePanel() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Ready to generate!");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [screenshotTarget, setScreenshotTarget] = useState(null);
   const [jobId, setJobId] = useState(null);
   const pollIntervalRef = useRef(null);
   
@@ -144,31 +262,11 @@ function IndexSidePanel() {
   };
 
   useEffect(() => {
-    const messageListener = (message) => {
-      if (message.type === "screenshot_ready" && screenshotTarget) {
-        console.log("Sidepanel received screenshot data.");
-        const file = dataURLtoFile(message.dataUrl, "screenshot.png");
-        if (screenshotTarget === 'person') {
-          setPersonImage(file);
-        } else if (screenshotTarget === 'cloth') {
-          setClothImage(file);
-        }
-        setScreenshotTarget(null); // Reset target
-      }
-    };
-    chrome.runtime.onMessage.addListener(messageListener);
-
     // Cleanup on component unmount
     return () => {
-      chrome.runtime.onMessage.removeListener(messageListener);
       stopPolling();
     };
-  }, [screenshotTarget]);
-
-  const handleStartScreenshot = (target) => {
-    setScreenshotTarget(target);
-    chrome.runtime.sendMessage({ type: "start_screenshot" });
-  };
+  }, []);
 
   // 点击生成按钮的处理函数 - 已更新为Runpod /runsync 逻辑
   const handleGenerate = async () => {
@@ -176,13 +274,6 @@ function IndexSidePanel() {
       setMessage("Please upload both a person and a clothing image.");
       return;
     }
-    // API密钥已设置，移除此处的检查
-    /*
-    if (RUNPOD_API_KEY === "PLEASE_REPLACE_WITH_YOUR_RUNPOD_API_KEY") {
-      setMessage("错误：请在代码中设置您的 Runpod API 密钥!");
-      return;
-    }
-    */
 
     setLoading(true);
     setImageUrls([]);
@@ -201,11 +292,6 @@ function IndexSidePanel() {
       // 定义图片在工作流中的引用名称
       const personImageFilename = "person_image.png";
       const clothImageFilename = "cloth_image.png";
-
-      // 关键：将工作流中的LoadImage节点的输入指向我们即将上传的图片文件名
-      // 节点 "74" 对应人物图片, "75" 对应服装图片
-      // workflow["74"].inputs.image = personImageFilename;
-      // workflow["75"].inputs.image = clothImageFilename;
 
       // 3. 构建符合Runpod API规范的请求体
       const body = {
@@ -297,10 +383,19 @@ function IndexSidePanel() {
         boxSizing: "border-box",
         gap: "16px",
       }}>
+      <style>{`
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+          20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+      `}</style>
+      
       <h2>Virtual Try-On</h2>
       
-      <ImageUpload title="Person Image" onImageSelect={setPersonImage} selectedImage={personImage} onScreenshot={() => handleStartScreenshot('person')} />
-      <ImageUpload title="Clothing Image" onImageSelect={setClothImage} selectedImage={clothImage} onScreenshot={() => handleStartScreenshot('cloth')} />
+      <ImageUpload title="Person Image" onImageSelect={setPersonImage} selectedImage={personImage} />
+      <ImageUpload title="Clothing Image" onImageSelect={setClothImage} selectedImage={clothImage} />
 
       <div style={{display: "flex", gap: "8px"}}>
         <button onClick={handleGenerate} disabled={loading || !personImage || !clothImage} style={{flex: 1}}>
