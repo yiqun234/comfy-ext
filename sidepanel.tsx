@@ -373,6 +373,15 @@ function IndexSidePanel() {
     setJobId(null);
   };
 
+  const handleSaveImage = (url: string, filename: string) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div
       style={{
@@ -422,7 +431,15 @@ function IndexSidePanel() {
         <div>
           <p>Result:</p>
           {imageUrls.map((url, index) => (
-            <img key={index} src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
+            <div key={index} style={{ marginBottom: "16px", textAlign: "center" }}>
+              <img src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
+              <button 
+                onClick={() => handleSaveImage(url, `result-${index + 1}.png`)}
+                style={{padding: "8px 16px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px", background: "transparent", cursor: "pointer"}}
+              >
+                Save Image
+              </button>
+            </div>
           ))}
         </div>
       )}
