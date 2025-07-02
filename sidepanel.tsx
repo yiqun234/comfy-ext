@@ -5,8 +5,10 @@ import {
   db,
   doc,
   setDoc,
+  GoogleAuthProvider,
   onAuthStateChanged, 
   signOut,
+  signInWithCredential,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword
 } from "./firebase";
@@ -266,6 +268,61 @@ function IndexSidePanel() {
     setLoading(false);
   };
 
+  // Handle Google Sign-in
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setMessage("Signing in with Google...");
+    
+    try {
+      // Use chrome.identity API to get access token
+      chrome.identity.getAuthToken({ 
+        interactive: true,
+        scopes: ['profile', 'email']
+      }, async (token) => {
+        if (chrome.runtime.lastError) {
+          console.error("Failed to get access token:", chrome.runtime.lastError);
+          setMessage("Google sign-in failed, please try again");
+          setLoading(false);
+          return;
+        }
+
+        if (!token) {
+          setMessage("Unable to get Google access token");
+          setLoading(false);
+          return;
+        }
+
+        try {
+          // Create Firebase credential using access token
+          const credential = GoogleAuthProvider.credential(null, token);
+          
+          // Sign in to Firebase with credential
+          const userCredential = await signInWithCredential(auth, credential);
+          
+          // Create/update user document in Firestore
+          await setDoc(doc(db, "users", userCredential.user.uid), {
+            email: userCredential.user.email,
+            displayName: userCredential.user.displayName,
+            photoURL: userCredential.user.photoURL,
+            provider: "google",
+            lastLogin: new Date()
+          }, { merge: true }); // Use merge to avoid overwriting existing data
+          
+          setMessage("Google sign-in successful!");
+        } catch (error) {
+          console.error("Firebase sign-in failed:", error);
+          setMessage(`Sign-in failed: ${error.message}`);
+        }
+        
+        setLoading(false);
+      });
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
+      setMessage(`Sign-in failed: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
   // Handle Sign-Out
   const handleSignOut = async () => {
     try {
@@ -287,7 +344,7 @@ function IndexSidePanel() {
   const handleJobCompletion = (result) => {
     stopPolling();
     setJobId(null);
-    setLoading(false);
+            setLoading(false);
 
     if (result.status === "COMPLETED") {
       const outputImages = result.output?.images;
@@ -575,22 +632,22 @@ function IndexSidePanel() {
             {loading && jobId && (
               <button onClick={handleStop} style={{flex: 1, backgroundColor: "#6c757d", color: "white", border: "none"}}>
                 Stop
-              </button>
+      </button>
             )}
           </div>
 
-          {loading && (
-            <div style={{width: "100%"}}>
-              <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
+      {loading && (
+        <div style={{width: "100%"}}>
+          <p style={{margin: 0, fontSize: "12px"}}>{message}</p>
               <div style={{width: "100%", backgroundColor: "#eee", borderRadius: 4, overflow: "hidden"}}>
                 <div style={{width: `100%`, height: "10px", backgroundColor: "#007bff", animation: "pulse 2s infinite ease-in-out"}}></div>
-              </div>
-            </div>
-          )}
+          </div>
+        </div>
+      )}
 
           {!loading && imageUrls.length > 0 && (
-            <div>
-              <p>Result:</p>
+        <div>
+          <p>Result:</p>
               {imageUrls.map((url, index) => (
                 <div key={index} style={{ marginBottom: "16px", textAlign: "center" }}>
                   <img src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
@@ -614,6 +671,7 @@ function IndexSidePanel() {
       ) : (
         <div className="form-container">
           <h3>{isRegistering ? "Register New Account" : "Sign In"}</h3>
+          
           <input
             type="email"
             value={email}
@@ -630,6 +688,43 @@ function IndexSidePanel() {
           />
           <button onClick={isRegistering ? handleRegister : handleEmailSignIn} disabled={loading}>
             {loading ? "..." : (isRegistering ? "Register" : "Sign In")}
+          </button>
+          
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            margin: "16px 0",
+            textAlign: "center"
+          }}>
+            <div style={{flex: 1, height: "1px", backgroundColor: "#ddd"}}></div>
+            <span style={{margin: "0 16px", color: "#666", fontSize: "14px"}}>or</span>
+            <div style={{flex: 1, height: "1px", backgroundColor: "#ddd"}}></div>
+          </div>
+          
+          {/* Google Sign-in Button */}
+          <button 
+            onClick={handleGoogleSignIn} 
+            disabled={loading}
+            style={{
+              backgroundColor: "#4285F4",
+              color: "white",
+              border: "none",
+              padding: "12px",
+              borderRadius: "4px",
+              cursor: loading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" style={{fill: "white"}}>
+              <path d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+              <path d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.53H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+              <path d="M4.5 10.49a4.8 4.8 0 0 1 0-3.07V5.35H1.83a8 8 0 0 0 0 7.28l2.67-2.14z"/>
+              <path d="M8.98 4.72c1.16 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.35L4.5 7.42a4.77 4.77 0 0 1 4.48-2.7z"/>
+            </svg>
+            {loading ? "Signing in..." : "Sign in with Google"}
           </button>
           <button onClick={() => setIsRegistering(!isRegistering)} className="toggle-auth-button">
             {isRegistering ? "Already have an account? Sign In" : "Need an account? Register"}
