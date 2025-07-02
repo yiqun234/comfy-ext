@@ -1,13 +1,14 @@
 {
   "name": "comfy-ext",
-  "displayName": "Comfy ext",
+  "displayName": "AI Fitting",
   "version": "0.0.1",
-  "description": "A basic Plasmo extension.",
+  "description": "A basic AI Fitting extension.",
   "author": "Lian",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "pack:ext": "pnpm build && chmod +x scripts/package-extension.sh && ./scripts/package-extension.sh"
   },
   "dependencies": {
     "@plasmohq/storage": "^1.15.0",
@@ -26,6 +27,7 @@
     "typescript": "5.3.3"
   },
   "manifest": {
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwExZTvtnxMTQ89yaBTc6o7UMV3UTTvN4YAxjfcLHWCswR8prmpuQfdZE2rnkvrPlk//56jRHVg3iblKWQFXIylxt6rpo5TgcsuTAjIw132U5hV5ZOnIvRiuo4Pndj+uEEbKqLp4xwjRkT7VKpftpaj0wdFrxrhuBh0JsDXxZdAaCHqH1FTCcPjPR5i5GkiBTUv5POm61oqJOsOYa7qpOC+IFb/E3k19zgaNMTEcmaPAfslMkCPFnd9ltk4LH3Gl10SmmBFUr+F2HA1M6ekwllN/d/dJyVOb1ewVb9beEx8wbe9VmIlThpDJ6AseOjwGRpTSRi5fSPVSDUGryiICkPwIDAQAB",
     "host_permissions": [
       "https://*/*"
     ],

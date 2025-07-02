@@ -34,3 +34,5 @@ dist/
 
 # Environment variables
 .env
+
+PRIVATE.pem
