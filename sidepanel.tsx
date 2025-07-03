@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react"
 import WORKFLOW_JSON from "./workflow.json";
-import { 
-  auth, 
+import {
+  auth,
   db,
   doc,
   setDoc,
   GoogleAuthProvider,
-  onAuthStateChanged, 
+  onAuthStateChanged,
   signOut,
   signInWithCredential,
   createUserWithEmailAndPassword,
@@ -84,7 +84,7 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
             const blob = await clipboardItem.getType(type);
             const file = new File([blob], `pasted-image.${type.split('/')[1]}`, { type });
             onImageSelect(file);
-            
+
             // Show paste success message
             setPasteSuccess(true);
             setTimeout(() => setPasteSuccess(false), 2000);
@@ -102,15 +102,15 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
 
   const dropZoneStyle: React.CSSProperties = {
     border: `2px dashed ${isDragging ? '#28a745' : '#ccc'}`, // Highlight border on drag
-    borderRadius: "4px", 
-    padding: "8px", 
-    textAlign: "center", 
+    borderRadius: "4px",
+    padding: "8px",
+    textAlign: "center",
     position: "relative",
     transition: 'border-color 0.2s ease-in-out' // Smooth transition for border color
   };
 
   return (
-    <div 
+    <div
       style={dropZoneStyle}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -120,10 +120,10 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
       <p style={{ margin: 0, fontWeight: "bold" }}>{title}</p>
       {selectedImage ? (
         <div style={{ width: "100%", height: "200px", marginTop: "8px", border: "1px solid #ddd", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-          <img 
-            src={typeof selectedImage === 'string' ? selectedImage : URL.createObjectURL(selectedImage)} 
-            alt="Preview" 
-            style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+          <img
+            src={typeof selectedImage === 'string' ? selectedImage : URL.createObjectURL(selectedImage)}
+            alt="Preview"
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
         </div>
       ) : (
@@ -131,7 +131,7 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
           <p style={{ color: "#888", pointerEvents: "none" }}>Upload, Paste or Drag & Drop Image</p>
         </div>
       )}
-      
+
       {/* 粘贴成功提示 */}
       {pasteSuccess && (
         <div style={{
@@ -150,7 +150,7 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
           ✓ Pasted!
         </div>
       )}
-      
+
       <div style={{display: "flex", gap: "8px", marginTop: "8px"}}>
         <label htmlFor={`file-upload-${title}`} style={{ cursor: "pointer", display: "block", flex: 1, padding: "8px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px" }}>
           {selectedImage ? "Change" : "Upload"}
@@ -159,13 +159,13 @@ function ImageUpload({ title, onImageSelect, selectedImage }) {
           Paste
         </button>
       </div>
-      <input 
+      <input
         ref={fileInputRef}
-        type="file" 
-        accept="image/*" 
-        onChange={handleFileChange} 
-        style={{ display: "none" }} 
-        id={`file-upload-${title}`} 
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+        id={`file-upload-${title}`}
       />
     </div>
   );
@@ -205,7 +205,7 @@ function IndexSidePanel() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [jobId, setJobId] = useState(null);
   const pollIntervalRef = useRef(null);
-  
+
   // Listen for auth state changes from Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -272,10 +272,10 @@ function IndexSidePanel() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setMessage("Signing in with Google...");
-    
+
     try {
       // Use chrome.identity API to get access token
-      chrome.identity.getAuthToken({ 
+      chrome.identity.getAuthToken({
         interactive: true,
         scopes: ['profile', 'email']
       }, async (token) => {
@@ -295,10 +295,10 @@ function IndexSidePanel() {
         try {
           // Create Firebase credential using access token
           const credential = GoogleAuthProvider.credential(null, token);
-          
+
           // Sign in to Firebase with credential
           const userCredential = await signInWithCredential(auth, credential);
-          
+
           // Create/update user document in Firestore
           await setDoc(doc(db, "users", userCredential.user.uid), {
             email: userCredential.user.email,
@@ -307,13 +307,13 @@ function IndexSidePanel() {
             provider: "google",
             lastLogin: new Date()
           }, { merge: true }); // Use merge to avoid overwriting existing data
-          
+
           setMessage("Google sign-in successful!");
         } catch (error) {
           console.error("Firebase sign-in failed:", error);
           setMessage(`Sign-in failed: ${error.message}`);
         }
-        
+
         setLoading(false);
       });
     } catch (error) {
@@ -352,7 +352,7 @@ function IndexSidePanel() {
         const urls = outputImages
           .filter(img => img.type === "base64" && img.data)
           .map(img => `data:image/png;base64,${img.data}`);
-        
+
         if (urls.length > 0) {
           setImageUrls(urls);
           setMessage(`Job completed! Displaying ${urls.length} image(s).`);
@@ -427,19 +427,15 @@ function IndexSidePanel() {
     setMessage("Preparing images and workflow...");
 
     try {
-      // 1. 将图片文件转换为Base64
+      // 1. to Base64
       const personImageBase64 = await fileToBase64(personImage);
       const clothImageBase64 = await fileToBase64(clothImage);
 
-      // 2. 准备工作流和输入
-      // 深拷贝一份工作流以安全地修改
       const workflow = JSON.parse(JSON.stringify(WORKFLOW_JSON));
-      
-      // 定义图片在工作流中的引用名称
+
       const personImageFilename = "person_image.png";
       const clothImageFilename = "cloth_image.png";
 
-      // 3. 构建符合Runpod API规范的请求体
       const body = {
         input: {
           workflow: workflow,
@@ -450,9 +446,8 @@ function IndexSidePanel() {
         }
       };
 
-      setMessage("Sending job to Runpod... This may take a while.");
+      setMessage("Sending job to Runpod... This may take 10-30 minutes.");
 
-      // 4. 发送同步请求到 /runsync
       const response = await fetch(`${RUNPOD_API_BASE_URL}/runsync`, {
         method: "POST",
         headers: {
@@ -467,9 +462,9 @@ function IndexSidePanel() {
         const errorText = await response.text();
         throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
       }
-      
+
       const result = await response.json();
-      
+
       // 5. 处理返回结果
       switch (result.status) {
         case "COMPLETED":
@@ -478,7 +473,7 @@ function IndexSidePanel() {
           handleJobCompletion(result);
           break;
         case "IN_QUEUE":
-          setMessage("Job is in queue, waiting for a worker...");
+          setMessage("Job is in queue, waiting for a worker, This may take 10-30 minutes...");
           setJobId(result.id);
           startPolling(result.id);
           break;
@@ -599,13 +594,13 @@ function IndexSidePanel() {
         }
         .dropdown-signout-button:hover { background-color: #f8f9fa; }
       `}</style>
-      
+
       <div className="auth-container">
         <h2>Virtual Try-On</h2>
         {user && (
           <div className="user-menu-container" ref={dropdownRef}>
-            <img 
-              src={user.photoURL || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.uid}`} 
+            <img
+              src={user.photoURL || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.uid}`}
               alt="User Avatar"
               className="user-avatar"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -651,7 +646,7 @@ function IndexSidePanel() {
               {imageUrls.map((url, index) => (
                 <div key={index} style={{ marginBottom: "16px", textAlign: "center" }}>
                   <img src={url} alt={`Generated result ${index + 1}`} style={{ width: "100%", height: "auto", borderRadius: "4px", marginBottom: "8px" }} />
-                  <button 
+                  <button
                     onClick={() => handleSaveImage(url, `result-${index + 1}.png`)}
                     style={{padding: "8px 16px", border: "1px solid #007bff", color: "#007bff", borderRadius: "4px", background: "transparent", cursor: "pointer"}}
                   >
@@ -671,7 +666,7 @@ function IndexSidePanel() {
       ) : (
         <div className="form-container">
           <h3>{isRegistering ? "Register New Account" : "Sign In"}</h3>
-          
+
           <input
             type="email"
             value={email}
@@ -689,7 +684,7 @@ function IndexSidePanel() {
           <button onClick={isRegistering ? handleRegister : handleEmailSignIn} disabled={loading}>
             {loading ? "..." : (isRegistering ? "Register" : "Sign In")}
           </button>
-          
+
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -700,10 +695,10 @@ function IndexSidePanel() {
             <span style={{margin: "0 16px", color: "#666", fontSize: "14px"}}>or</span>
             <div style={{flex: 1, height: "1px", backgroundColor: "#ddd"}}></div>
           </div>
-          
+
           {/* Google Sign-in Button */}
-          <button 
-            onClick={handleGoogleSignIn} 
+          <button
+            onClick={handleGoogleSignIn}
             disabled={loading}
             style={{
               backgroundColor: "#4285F4",
